@@ -88,7 +88,6 @@ func ScanProductAPIs(path, product, region string) (int, error) {
 		}
 	}
 
-	fmt.Printf("\t[DEBUG] %s service has %d APIs\n", product, count)
 	return count, nil
 }
 

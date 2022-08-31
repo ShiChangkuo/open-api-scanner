@@ -67,6 +67,7 @@ func main() {
 	if productName == "" {
 		ScanAllAPIs(outputPath, region)
 	} else {
-		ScanProductAPIs(outputPath, productName, region)
+		count, _ := ScanProductAPIs(outputPath, productName, region)
+		fmt.Printf("[DEBUG] %s service has %d APIs\n", productName, count)
 	}
 }

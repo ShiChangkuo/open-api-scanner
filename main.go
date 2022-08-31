@@ -46,7 +46,7 @@ func main() {
 
 	flag.StringVar(&outputDir, "o", "./target/yaml", "the output dir")
 	flag.BoolVar(&eLanguage, "e", false, "english version")
-	flag.StringVar(&productName, "product", "", "the product name, e.g. ECS, VPC")
+	flag.StringVar(&productName, "product", "", "the product name, e.g. ECS, VPC. If not specified, all products will be scaned.")
 	flag.Parse()
 
 	outputPath, _ := filepath.Abs(outputDir)

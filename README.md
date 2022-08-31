@@ -10,4 +10,6 @@ Usage of ./open-api-scanner:
   -e    english version
   -o string
         the output dir (default "./target/yaml")
+  -product string
+        the product name, e.g. ECS, VPC. If not specified, all products will be scaned.
 ```

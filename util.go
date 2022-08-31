@@ -18,14 +18,15 @@ const (
 	MaxPageSize = 100
 )
 
-type ListCommitsOpts struct {
+type ListAPIOpts struct {
 	Offset       int
 	Limit        int
 	ProductShort string
+	Version      string
 }
 
-// ToListQuery formats a ListCommitsOpts into a query string.
-func (opts ListCommitsOpts) ToListQuery() string {
+// ToListQuery formats a ListAPIOpts into a query string.
+func (opts ListAPIOpts) ToListQuery() string {
 	params := url.Values{}
 
 	params.Add("offset", strconv.Itoa(opts.Offset))
@@ -33,6 +34,9 @@ func (opts ListCommitsOpts) ToListQuery() string {
 
 	if opts.ProductShort != "" {
 		params.Add("product_short", opts.ProductShort)
+	}
+	if opts.Version != "" {
+		params.Add("info_version", opts.Version)
 	}
 
 	return params.Encode()
@@ -65,6 +69,11 @@ type APIBasicInfo struct {
 	Version      string `json:"info_version"`
 }
 
+type ProductVersion struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
 func getAllProducts() ([]APIGroup, error) {
 	url := fmt.Sprintf("%s/v4/products", apiEndpoint)
 	fmt.Printf("[DEBUG] list products url: %s\n", url)
@@ -86,16 +95,50 @@ func getAllProducts() ([]APIGroup, error) {
 	return response.Groups, nil
 }
 
-func getProductAPIs(product string) ([]APIBasicInfo, error) {
+func getProductVersions(product string) ([]string, error) {
+	result := []string{}
+	url := fmt.Sprintf("%s/v2/versions?productshort=%s", apiEndpoint, product)
+
+	body, err := httpRequest("GET", url, nil, nil)
+	if err != nil {
+		fmt.Printf("[ERROR] request %s failed, reason: %s\n", url, err)
+		return nil, err
+	}
+
+	response := struct {
+		Count      int              `json:"count"`
+		IsMultiple bool             `json:"is_multiple_version"`
+		Versions   []ProductVersion `json:"versions"`
+	}{}
+
+	err = json.Unmarshal(body, &response)
+	if err != nil {
+		fmt.Printf("[ERROR] Unmarshal failed: %s\n", err)
+		return nil, err
+	}
+
+	for _, v := range response.Versions {
+		result = append(result, v.Name)
+	}
+
+	// add an empty version if not found
+	if len(result) == 0 {
+		return []string{""}, nil
+	}
+	return result, nil
+}
+
+func getProductAPIs(product, version string) ([]APIBasicInfo, error) {
 	result := []APIBasicInfo{}
 	baseURL := fmt.Sprintf("%s/v3/apis", apiEndpoint)
 
 	pageSize := MaxPageSize
 	offset := 0
-	listOpts := ListCommitsOpts{
+	listOpts := ListAPIOpts{
 		Offset:       offset,
 		Limit:        MaxPageSize,
 		ProductShort: product,
+		Version:      version,
 	}
 
 	for pageSize == MaxPageSize {
@@ -130,10 +173,12 @@ func getProductAPIs(product string) ([]APIBasicInfo, error) {
 	return result, nil
 }
 
-func getAPIDetail(product, apiName, region string) ([]byte, error) {
+func getAPIDetail(product, apiName, apiVersion, region string) ([]byte, error) {
 	url := fmt.Sprintf("%s/v4/apis/detail?product_short=%s&name=%s&region_id=%s",
 		apiEndpoint, product, apiName, region)
-	//fmt.Printf("[DEBUG] get API detail url: %s\n", url)
+	if apiVersion != "" {
+		url += fmt.Sprintf("&info_version=%s", apiVersion)
+	}
 
 	body, err := httpRequest("GET", url, nil, nil)
 	if err != nil {

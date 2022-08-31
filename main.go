@@ -94,28 +94,43 @@ func ScanAllAPIs(path string) error {
 			}
 			total += p.APICount
 
-			apiInfos, err := getProductAPIs(p.ProductShort)
-			if err != nil || len(apiInfos) == 0 {
-				fmt.Printf("\t[WARN] failed to fetch APIs of %s: %s\n", p.ProductShort, err)
+			apiVersions, err := getProductVersions(p.ProductShort)
+			if err != nil {
+				fmt.Printf("\t[WARN] failed to fetch API versions of %s: %s\n", p.ProductShort, err)
 				continue
 			}
+			if len(apiVersions) > 1 {
+				fmt.Printf("\t[DEBUG]  %s service has multiple API versions: %s\n", p.ProductShort, apiVersions)
+			}
 
-			productDir := filepath.Join(path, catalog, p.ProductShort)
-			os.Mkdir(productDir, 0750)
-
-			for _, item := range apiInfos {
-				detail, err := getAPIDetail(p.ProductShort, item.Name, region)
-				if err != nil {
-					fmt.Printf("\t[WARN] failed to fetch API detail: %s\n", err)
+			for _, ver := range apiVersions {
+				apiInfos, err := getProductAPIs(p.ProductShort, ver)
+				if err != nil || len(apiInfos) == 0 {
+					fmt.Printf("\t[WARN] failed to fetch APIs of %s: %s\n", p.ProductShort, err)
 					continue
 				}
 
-				yamlFile := fmt.Sprintf("%s/%s.yaml", productDir, item.Name)
-				if err := convertJSON2YAML(detail, yamlFile); err != nil {
-					fmt.Printf("\t[WARN] failed to save yaml: %s\n", err)
+				productDir := filepath.Join(path, catalog, p.ProductShort, ver)
+				err = os.MkdirAll(productDir, 0750)
+				if err != nil && !os.IsExist(err) {
+					fmt.Printf("\t[WARN] failed to create directory %s: %s\n", productDir, err)
 					continue
 				}
-				success++
+
+				for _, item := range apiInfos {
+					detail, err := getAPIDetail(p.ProductShort, item.Name, ver, region)
+					if err != nil {
+						fmt.Printf("\t[WARN] failed to fetch API detail: %s\n", err)
+						continue
+					}
+
+					yamlFile := fmt.Sprintf("%s/%s.yaml", productDir, item.Name)
+					if err := convertJSON2YAML(detail, yamlFile); err != nil {
+						fmt.Printf("\t[WARN] failed to save yaml: %s\n", err)
+						continue
+					}
+					success++
+				}
 			}
 		}
 	}

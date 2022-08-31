@@ -13,8 +13,9 @@ import (
 )
 
 var (
-	outputDir string
-	eLanguage bool
+	outputDir   string
+	productName string
+	eLanguage   bool
 )
 
 func getCurrentPath() string {
@@ -48,6 +49,7 @@ func main() {
 
 	flag.StringVar(&outputDir, "o", "./target/yaml", "the output dir")
 	flag.BoolVar(&eLanguage, "e", false, "english version")
+	flag.StringVar(&productName, "product", "", "the product name, e.g. ECS, VPC")
 	flag.Parse()
 
 	outputPath, _ := filepath.Abs(outputDir)
@@ -64,17 +66,17 @@ func main() {
 		os.Exit(2)
 	}
 
-	ScanAllAPIs(outputPath)
-
+	region := os.Getenv("HW_REGION")
+	if productName == "" {
+		ScanAllAPIs(outputPath, region)
+	} else {
+		ScanProductAPIs(outputPath, productName, region)
+	}
 }
 
-func ScanAllAPIs(path string) error {
+// ScanAllAPIs can scan all APIs in the API Explorer
+func ScanAllAPIs(path, region string) error {
 	var total, success int
-
-	region := os.Getenv("HW_REGION")
-	if region != "" {
-		region = "cn-north-4"
-	}
 
 	groups, err := getAllProducts()
 	if err != nil {
@@ -85,7 +87,8 @@ func ScanAllAPIs(path string) error {
 	for i, g := range groups {
 		fmt.Printf("[DEBUG] %d group name: %s\n", i, g.Name)
 		catalog := strings.ReplaceAll(g.Name, " ", "_")
-		os.Mkdir(filepath.Join(path, catalog), 0750)
+		catalogDir := filepath.Join(path, catalog)
+		os.Mkdir(catalogDir, 0750)
 
 		for j, p := range g.Products {
 			fmt.Printf("\t[DEBUG] %d product name: %s(%s) / %d\n", j, p.Name, p.ProductShort, p.APICount)
@@ -94,49 +97,63 @@ func ScanAllAPIs(path string) error {
 			}
 			total += p.APICount
 
-			apiVersions, err := getProductVersions(p.ProductShort)
+			count, err := ScanProductAPIs(catalogDir, p.ProductShort, region)
 			if err != nil {
-				fmt.Printf("\t[WARN] failed to fetch API versions of %s: %s\n", p.ProductShort, err)
 				continue
 			}
-			if len(apiVersions) > 1 {
-				fmt.Printf("\t[DEBUG]  %s service has multiple API versions: %s\n", p.ProductShort, apiVersions)
-			}
-
-			for _, ver := range apiVersions {
-				apiInfos, err := getProductAPIs(p.ProductShort, ver)
-				if err != nil || len(apiInfos) == 0 {
-					fmt.Printf("\t[WARN] failed to fetch APIs of %s: %s\n", p.ProductShort, err)
-					continue
-				}
-
-				productDir := filepath.Join(path, catalog, p.ProductShort, ver)
-				err = os.MkdirAll(productDir, 0750)
-				if err != nil && !os.IsExist(err) {
-					fmt.Printf("\t[WARN] failed to create directory %s: %s\n", productDir, err)
-					continue
-				}
-
-				for _, item := range apiInfos {
-					detail, err := getAPIDetail(p.ProductShort, item.Name, ver, region)
-					if err != nil {
-						fmt.Printf("\t[WARN] failed to fetch API detail: %s\n", err)
-						continue
-					}
-
-					yamlFile := fmt.Sprintf("%s/%s.yaml", productDir, item.Name)
-					if err := convertJSON2YAML(detail, yamlFile); err != nil {
-						fmt.Printf("\t[WARN] failed to save yaml: %s\n", err)
-						continue
-					}
-					success++
-				}
-			}
+			success += count
 		}
 	}
 
 	fmt.Printf("[DEBUG] total APIs: %d / %d\n", success, total)
 	return nil
+}
+
+// ScanProductAPIs can scan all APIs in the product
+func ScanProductAPIs(path, product, region string) (int, error) {
+	var count int
+
+	apiVersions, err := getProductVersions(product)
+	if err != nil {
+		fmt.Printf("\t[WARN] failed to fetch API versions of %s: %s\n", product, err)
+		return count, err
+	}
+	if len(apiVersions) > 1 {
+		fmt.Printf("\t[DEBUG] %s service has multiple API versions: %s\n", product, apiVersions)
+	}
+
+	for _, ver := range apiVersions {
+		apiInfos, err := getProductAPIs(product, ver)
+		if err != nil || len(apiInfos) == 0 {
+			fmt.Printf("\t[WARN] failed to fetch APIs of %s: %s\n", product, err)
+			continue
+		}
+
+		productDir := filepath.Join(path, product, ver)
+		err = os.MkdirAll(productDir, 0750)
+		if err != nil && !os.IsExist(err) {
+			fmt.Printf("\t[WARN] failed to create directory %s: %s\n", productDir, err)
+			continue
+		}
+
+		for _, item := range apiInfos {
+			detail, err := getAPIDetail(product, item.Name, ver, region)
+			if err != nil {
+				fmt.Printf("\t[WARN] failed to fetch API detail: %s\n", err)
+				continue
+			}
+
+			yamlFile := fmt.Sprintf("%s/%s.yaml", productDir, item.Name)
+			if err := convertJSON2YAML(detail, yamlFile); err != nil {
+				fmt.Printf("\t[WARN] failed to save yaml: %s\n", err)
+				continue
+			}
+			count++
+		}
+	}
+
+	fmt.Printf("\t[DEBUG] %s service has %d APIs\n", product, count)
+	return count, nil
 }
 
 func convertJSON2YAML(body []byte, path string) error {

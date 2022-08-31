@@ -174,10 +174,13 @@ func getProductAPIs(product, version string) ([]APIBasicInfo, error) {
 }
 
 func getAPIDetail(product, apiName, apiVersion, region string) ([]byte, error) {
-	url := fmt.Sprintf("%s/v4/apis/detail?product_short=%s&name=%s&region_id=%s",
-		apiEndpoint, product, apiName, region)
+	url := fmt.Sprintf("%s/v4/apis/detail?product_short=%s&name=%s",
+		apiEndpoint, product, apiName)
 	if apiVersion != "" {
 		url += fmt.Sprintf("&info_version=%s", apiVersion)
+	}
+	if region != "" {
+		url += fmt.Sprintf("&region_id=%s", region)
 	}
 
 	body, err := httpRequest("GET", url, nil, nil)

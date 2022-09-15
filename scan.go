@@ -60,8 +60,13 @@ func ScanProductAPIs(path, product, region string) (int, error) {
 
 	for _, ver := range apiVersions {
 		apiInfos, err := getProductAPIs(product, ver)
-		if err != nil || len(apiInfos) == 0 {
+		if err != nil {
 			fmt.Printf("\t[WARN] failed to fetch APIs of %s: %s\n", product, err)
+			continue
+		}
+
+		if len(apiInfos) == 0 {
+			fmt.Printf("\t[DEBUG] %s service has 0 API\n", product)
 			continue
 		}
 

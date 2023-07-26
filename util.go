@@ -14,8 +14,9 @@ import (
 )
 
 const (
-	apiEndpoint = "https://apiexplorer.developer.huaweicloud.com"
-	MaxPageSize = 100
+	apiEndpoint       = "https://apiexplorer.cn-north-4.myhuaweicloud.com"
+	apiDetailEndpoint = "https://console.huaweicloud.com/apiexplorer"
+	MaxPageSize       = 100
 )
 
 type ListAPIOpts struct {
@@ -175,7 +176,7 @@ func getProductAPIs(product, version string) ([]APIBasicInfo, error) {
 
 func getAPIDetail(product, apiName, apiVersion, region string) ([]byte, error) {
 	url := fmt.Sprintf("%s/v4/apis/detail?product_short=%s&name=%s",
-		apiEndpoint, product, apiName)
+		apiDetailEndpoint, product, apiName)
 	if apiVersion != "" {
 		url += fmt.Sprintf("&info_version=%s", apiVersion)
 	}
